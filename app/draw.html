@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MNIST - Reconocimiento de números</title>
 
 <style>
@@ -9,13 +10,16 @@ body {
     font-family: Arial, sans-serif;
     text-align: center;
     background: #f4f6f8;
+    margin: 0;
+    padding: 20px 0;
 }
 
 .container {
-    width: 420px;
-    margin: 50px auto;
+    width: min(420px, calc(100vw - 32px));
+    margin: 30px auto;
     background: white;
-    padding: 30px;
+    padding: 24px;
+    box-sizing: border-box;
     border-radius: 14px;
     box-shadow: 0 4px 15px rgba(0,0,0,.15);
 }
@@ -24,6 +28,11 @@ canvas {
     background: black;
     border: 3px solid #444;
     cursor: crosshair;
+    touch-action: none;
+    width: min(280px, 100%);
+    height: auto;
+    display: block;
+    margin: 0 auto;
 }
 
 button {
@@ -64,72 +73,78 @@ const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
 ctx.fillStyle = "black";
-ctx.fillRect(0,0,canvas.width,canvas.height);
+ctx.fillRect(0, 0, canvas.width, canvas.height);
 
 ctx.strokeStyle = "white";
 ctx.lineWidth = 22;
 ctx.lineCap = "round";
+ctx.lineJoin = "round";
 
 let dibujando = false;
 
-canvas.addEventListener("mousedown", () => {
-    dibujando = true;
-});
-
-canvas.addEventListener("mouseup", () => {
-    dibujando = false;
-    ctx.beginPath();
-});
-
-canvas.addEventListener("mousemove", dibujar);
-
-function dibujar(e) {
-
-    if (!dibujando) return;
-
+function posicion(e) {
     const rect = canvas.getBoundingClientRect();
+    const escalaX = canvas.width / rect.width;
+    const escalaY = canvas.height / rect.height;
 
-    ctx.lineTo(
-        e.clientX - rect.left,
-        e.clientY - rect.top
-    );
-
-    ctx.stroke();
-    ctx.beginPath();
-
-    ctx.moveTo(
-        e.clientX - rect.left,
-        e.clientY - rect.top
-    );
+    return {
+        x: (e.clientX - rect.left) * escalaX,
+        y: (e.clientY - rect.top) * escalaY
+    };
 }
 
+function iniciarDibujo(e) {
+    e.preventDefault();
+    dibujando = true;
+
+    if (canvas.setPointerCapture) {
+        canvas.setPointerCapture(e.pointerId);
+    }
+
+    const p = posicion(e);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+}
+
+function terminarDibujo(e) {
+    if (!dibujando) return;
+    e.preventDefault();
+    dibujando = false;
+    ctx.beginPath();
+}
+
+function dibujar(e) {
+    if (!dibujando) return;
+    e.preventDefault();
+
+    const p = posicion(e);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+}
+
+canvas.addEventListener("pointerdown", iniciarDibujo);
+canvas.addEventListener("pointermove", dibujar);
+canvas.addEventListener("pointerup", terminarDibujo);
+canvas.addEventListener("pointercancel", terminarDibujo);
+canvas.addEventListener("pointerleave", terminarDibujo);
+
 function limpiar() {
-
     ctx.fillStyle = "black";
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     document.getElementById("resultado").innerHTML = "";
 }
 
 function predecir() {
-
     canvas.toBlob(async blob => {
-
         const formData = new FormData();
+        formData.append("file", blob, "numero.png");
 
-        formData.append(
-            "file",
-            blob,
-            "numero.png"
-        );
-
-        const response = await fetch(
-            "/predict",
-            {
-                method: "POST",
-                body: formData
-            }
-        );
+        const response = await fetch("/predict", {
+            method: "POST",
+            body: formData
+        });
 
         const resultado = await response.json();
 
