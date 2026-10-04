@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>MNIST - Reconocimiento de números</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    background: #f4f6f8;
+}
+
+.container {
+    width: 420px;
+    margin: 50px auto;
+    background: white;
+    padding: 30px;
+    border-radius: 14px;
+    box-shadow: 0 4px 15px rgba(0,0,0,.15);
+}
+
+canvas {
+    background: black;
+    border: 3px solid #444;
+    cursor: crosshair;
+}
+
+button {
+    margin: 15px 5px;
+    padding: 10px 20px;
+    font-size: 16px;
+}
+
+#resultado {
+    font-size: 22px;
+    margin-top: 20px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>Reconocimiento de dígitos</h2>
+
+<p>Dibuja un número del 0 al 9</p>
+
+<canvas id="canvas" width="280" height="280"></canvas>
+
+<br>
+
+<button onclick="limpiar()">Borrar</button>
+<button onclick="predecir()">Predecir</button>
+
+<div id="resultado"></div>
+
+</div>
+
+<script>
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+ctx.fillStyle = "black";
+ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ctx.strokeStyle = "white";
+ctx.lineWidth = 22;
+ctx.lineCap = "round";
+
+let dibujando = false;
+
+canvas.addEventListener("mousedown", () => {
+    dibujando = true;
+});
+
+canvas.addEventListener("mouseup", () => {
+    dibujando = false;
+    ctx.beginPath();
+});
+
+canvas.addEventListener("mousemove", dibujar);
+
+function dibujar(e) {
+
+    if (!dibujando) return;
+
+    const rect = canvas.getBoundingClientRect();
+
+    ctx.lineTo(
+        e.clientX - rect.left,
+        e.clientY - rect.top
+    );
+
+    ctx.stroke();
+    ctx.beginPath();
+
+    ctx.moveTo(
+        e.clientX - rect.left,
+        e.clientY - rect.top
+    );
+}
+
+function limpiar() {
+
+    ctx.fillStyle = "black";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    document.getElementById("resultado").innerHTML = "";
+}
+
+function predecir() {
+
+    canvas.toBlob(async blob => {
+
+        const formData = new FormData();
+
+        formData.append(
+            "file",
+            blob,
+            "numero.png"
+        );
+
+        const response = await fetch(
+            "/predict",
+            {
+                method: "POST",
+                body: formData
+            }
+        );
+
+        const resultado = await response.json();
+
+        document.getElementById("resultado").innerHTML =
+            "Número: <b>" + resultado.digit +
+            "</b><br>Confianza: " +
+            (resultado.confidence * 100).toFixed(2) +
+            "%";
+
+    }, "image/png");
+}
+
+</script>
+
+</body>
+</html>
